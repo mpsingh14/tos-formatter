@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>OptionStrat → ThinkOrSwim Formatter</title>
+  <style>
+    body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#0f172a; color:#e6eef8; padding:24px; }
+    .card { background: linear-gradient(180deg,#071027 0%, #081428 100%); border:1px solid rgba(255,255,255,0.04); padding:18px; border-radius:12px; max-width:880px; margin:0 auto; box-shadow: 0 8px 30px rgba(2,6,23,0.6);}
+    h1 { margin:0 0 8px 0; font-size:20px; }
+    p.lead { margin:0 0 16px 0; color:#9fb3d6; font-size:13px; }
+    label { display:block; font-size:12px; color:#9fb3d6; margin-top:12px; }
+    input[type="text"], textarea, select { width:100%; padding:10px 12px; margin-top:6px; border-radius:8px; background:#061428; border:1px solid rgba(255,255,255,0.04); color:#e6eef8; font-size:14px; box-sizing:border-box; }
+    .row { display:flex; gap:8px; }
+    .col { flex:1; }
+    button { background:#0ea5a9; color:#022; padding:10px 12px; border-radius:8px; border:0; cursor:pointer; font-weight:600; margin-top:12px; }
+    pre.output { background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; margin-top:12px; font-size:13px; overflow:auto; white-space:pre-wrap; }
+    small.hint { color:#7fa3cf; font-size:12px; display:block; margin-top:6px; }
+    .examples { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+    .chip { background:#062b3a; padding:6px 10px; border-radius:999px; cursor:pointer; border:1px solid rgba(255,255,255,0.02); font-size:13px; color:#bfe6e6; }
+    footer { margin-top:18px; color:#5f7ea0; font-size:12px; text-align:center; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>OptionStrat → ThinkOrSwim formatter</h1>
+    <p class="lead">Paste your OptionStrat label, tweak a couple fields, and get a ThinkOrSwim order string you can copy/paste into TOS order entry. (No trading, just formatting.)</p>
+
+    <label>OptionStrat input</label>
+    <input id="inputText" type="text" placeholder="e.g. SPX Sep 12th 6510/6550/6590 Iron Butterfly" value="SPX Sep 12th 6510/6550/6590 Iron Butterfly" />
+
+    <div class="row" style="margin-top:8px;">
+      <div class="col">
+        <label>Action</label>
+        <select id="action">
+          <option>SELL</option>
+          <option>BUY</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Quantity (absolute)</label>
+        <input id="qty" type="text" value="-1" />
+        <small class="hint">Use -1 to match "SELL -1" style; positive numbers fine for BUY.</small>
+      </div>
+      <div class="col">
+        <label>Multiplier</label>
+        <input id="mult" type="text" value="100" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col">
+        <label>Order price (optional)</label>
+        <input id="price" type="text" placeholder="47.95" />
+      </div>
+      <div class="col">
+        <label>Price type</label>
+        <select id="priceType">
+          <option>LMT</option>
+          <option>MARKET</option>
+          <option>NET_DEBIT</option>
+          <option>NET_CREDIT</option>
+        </select>
+      </div>
+      <div class="col">
+        <label>Year override</label>
+        <input id="year" type="text" placeholder="2025" />
+        <small class="hint">Leave empty to auto-select current year.</small>
+      </div>
+    </div>
+
+    <label style="margin-top:12px;"><input id="isWeeklys" type="checkbox" checked /> Include (Weeklys) tag</label>
+
+    <div style="margin-top:10px;">
+      <button id="convertBtn">Convert →</button>
+      <button id="copyBtn" style="background:#5b21b6; margin-left:8px;">Copy output</button>
+    </div>
+
+    <pre class="output" id="outputArea">Output will appear here...</pre>
+
+    <div style="margin-top:12px;">
+      <strong>Quick examples:</strong>
+      <div class="examples">
+        <div class="chip" data-s="SPX Sep 12th 6510/6550/6590 Iron Butterfly">SPX Sep 12th ...</div>
+        <div class="chip" data-s="SPY Oct 3 400/410/420 Iron Butterfly">SPY Oct 3 ...</div>
+        <div class="chip" data-s="AAPL Nov 21 150/155/160 Iron Butterfly">AAPL Nov 21 ...</div>
+      </div>
+    </div>
+
+    <footer>Deploy this file to a GitHub Pages repo for a tiny web app. Want a repo skeleton? I can give it.</footer>
+  </div>
+
+<script>
+(function(){
+  const MONTHS = {jan:'JAN', feb:'FEB', mar:'MAR', apr:'APR', may:'MAY', jun:'JUN', jul:'JUL', aug:'AUG', sep:'SEP', sept:'SEP', oct:'OCT', nov:'NOV', dec:'DEC', september:'SEP', august:'AUG'};
+  const mapStrategy = {
+    'iron butterfly': 'IRON CONDOR',   // loose mapping to match your example
+    'iron condor': 'IRON CONDOR',
+    'butterfly': 'BUTTERFLY',
+    'condor': 'CONDOR'
+  };
+
+  function parseInput(s) {
+    // Normalize
+    s = s.trim();
+    // Underlying = first token (letters/numbers)
+    const underlyingMatch = s.match(/^([A-Za-z0-9\.\^]+)/);
+    const underlying = underlyingMatch ? underlyingMatch[1].toUpperCase() : '';
+
+    // Month + day. support "Sep 12th", "September 12", "Oct 3"
+    let month = null, day = null;
+    const md = s.match(/([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?/i);
+    if (md) {
+      month = md[1].toLowerCase();
+      day = parseInt(md[2],10);
+    } else {
+      // also allow formats like "12 Sep"
+      const md2 = s.match(/(\d{1,2})\s+([A-Za-z]+)/i);
+      if (md2) {
+        day = parseInt(md2[1],10);
+        month = md2[2].toLowerCase();
+      }
+    }
+
+    // strikes: find 2+ numbers separated by '/'
+    const strikesMatch = s.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)(?:\s*\/\s*(\d+(?:\.\d+)?))?/);
+    let strikes = [];
+    if (strikesMatch) {
+      // split by '/' robustly
+      // find the first substring that looks like "num/num[/num]"
+      const all = s.match(/(\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)+)/);
+      if (all && all[1]) {
+        strikes = all[1].split('/').map(x=>x.trim());
+      }
+    }
+
+    // strategy: last word(s) e.g. "Iron Butterfly"
+    // we attempt to read trailing words after strikes
+    let strategy = '';
+    const strategyMatch = s.match(/(?:\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)+)\s+(.+)$/i);
+    if (strategyMatch) {
+      strategy = strategyMatch[1].trim();
+    } else {
+      // fallback: last token
+      const parts = s.split(' ');
+      strategy = parts.slice(-2).join(' ');
+    }
+
+    return { underlying, month, day, strikes, strategyRaw: strategy };
+  }
+
+  function monthToMon(monthStr) {
+    if (!monthStr) return '';
+    const k = monthStr.toLowerCase().slice(0,3);
+    return MONTHS[k] || monthStr.toUpperCase().slice(0,3);
+  }
+
+  function yearShort(year) {
+    return String(year).slice(-2);
+  }
+
+  function buildTOSString(parsed, opts) {
+    // opts: action, qty, mult, price, priceType, year, isWeeklys
+    const {underlying, month, day, strikes, strategyRaw} = parsed;
+
+    if (!underlying || !month || !day || strikes.length < 2) {
+      return 'Could not parse input — make sure it includes underlying, month/day and strikes (e.g. SPX Sep 12th 6510/6550/6590)';
+    }
+
+    // normalize strikes to numeric strings
+    const s = strikes.map(x => x.replace(/[^0-9.]/g,''));
+
+    // Strategy mapping
+    const key = strategyRaw.toLowerCase();
+    let stratLabel = mapStrategy[key] || (mapStrategy[key.split(' ').slice(-2).join(' ')] || (strategyRaw.toUpperCase()));
+
+    // Special handling for Iron Butterfly -> create call/put strike order like your example:
+    // input strikes: [low, mid, high] -> CALL: mid/high, PUT: mid/low -> "mid/high/mid/low CALL/PUT"
+    let strikeOrder = '';
+    if (/iron butterfly/i.test(strategyRaw) || /butterfly/i.test(strategyRaw)) {
+      // make sure we have 3 strikes (low, mid, high). if only two provided, create symmetric wings (guess)
+      let low, mid, high;
+      if (s.length === 3) {
+        [low, mid, high] = s;
+      } else if (s.length === 2) {
+        // guess: lower & upper -> mid is center
+        low = s[0]; high = s[1]; mid = String((parseFloat(low) + parseFloat(high))/2);
+      } else {
+        // fallback
+        low = s[0]; mid = s[1] || s[0]; high = s[s.length-1];
+      }
+      // format: mid/high/mid/low
+      strikeOrder = `${mid}/${high}/${mid}/${low} CALL/PUT`;
+    } else if (/iron condor/i.test(strategyRaw) || /condor/i.test(strategyRaw)) {
+      // For a 4-strike condor user might input 4 strikes; otherwise we try to infer from 3 strikes
+      if (s.length === 4) {
+        // assume order left->right: lowShort/lowLong/highShort/highLong or similar
+        strikeOrder = `${s[2]}/${s[3]}/${s[1]}/${s[0]} CALL/PUT`;
+      } else if (s.length === 3) {
+        // [low, low-mid, high] -> similar transform to butterfly
+        const [low, mid, high] = s;
+        strikeOrder = `${mid}/${high}/${mid}/${low} CALL/PUT`;
+      } else {
+        strikeOrder = s.join('/') + ' CALL/PUT';
+      }
+    } else {
+      // generic fallback: if 3 strikes produce mid/high/mid/low format; else join
+      if (s.length === 3) {
+        const [low, mid, high] = s;
+        strikeOrder = `${mid}/${high}/${mid}/${low} CALL/PUT`;
+      } else {
+        strikeOrder = s.join('/') + ' CALL/PUT';
+      }
+    }
+
+    // date formatting: "12 SEP 25"
+    const mon = monthToMon(month);
+    const y = opts.year ? opts.year : (new Date()).getFullYear();
+    const yShort = yearShort(y);
+
+    const weeklyText = opts.isWeeklys ? '(Weeklys)' : '';
+
+    // final pieces
+    const action = opts.action || 'SELL';
+    const qty = opts.qty || '-1';
+    const mult = opts.mult || '100';
+    let priceFragment = '';
+    if (opts.price) {
+      priceFragment = ` @${opts.price} ${opts.priceType || 'LMT'}`;
+    } else {
+      priceFragment = ` ${opts.priceType || 'LMT'}`; // still show type
+    }
+
+    // assemble
+    const out = `${action} ${qty} ${stratLabel} ${underlying} ${mult} ${weeklyText} ${day} ${mon} ${yShort} ${strikeOrder}${priceFragment}`.replace(/\s+/g,' ').trim();
+    return out;
+  }
+
+  // UI wiring
+  const input = document.getElementById('inputText');
+  const btn = document.getElementById('convertBtn');
+  const out = document.getElementById('outputArea');
+  const copyBtn = document.getElementById('copyBtn');
+
+  document.querySelectorAll('.chip').forEach(c => {
+    c.addEventListener('click', ()=> {
+      input.value = c.dataset.s;
+    });
+  });
+
+  btn.addEventListener('click', () => {
+    const text = input.value;
+    const parsed = parseInput(text);
+    const opts = {
+      action: document.getElementById('action').value,
+      qty: document.getElementById('qty').value,
+      mult: document.getElementById('mult').value,
+      price: (document.getElementById('price').value || '').trim(),
+      priceType: document.getElementById('priceType').value,
+      year: (document.getElementById('year').value || '').trim() || null,
+      isWeeklys: document.getElementById('isWeeklys').checked
+    };
+    const result = buildTOSString(parsed, opts);
+    out.textContent = result;
+  });
+
+  copyBtn.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(out.textContent);
+      copyBtn.textContent = 'Copied!';
+      setTimeout(()=> copyBtn.textContent = 'Copy output', 1200);
+    } catch(e) {
+      alert('Could not copy — select and copy manually.');
+    }
+  });
+
+  // run initial conversion
+  btn.click();
+
+})();
+</script>

@@ -32,7 +32,7 @@
       <option value="5">5</option>
       <option value="20">20</option>
       <option value="40">40</option>
-      <option value="50" selected>50</option>
+      <option value="50">50</option>
       <option value="100">100</option>
       <option value="custom">Custom</option>
     </select>
@@ -41,7 +41,14 @@
 
   <label>Ticker <input type="text" id="ticker" value="SPX"></label>
   <label>Date <input type="date" id="tradeDate"></label>
+  <label>Action 
+    <select id="action">
+      <option value="SELL">SELL</option>
+      <option value="BUY">BUY</option>
+    </select>
+  </label>
   <label>Quantity <input type="number" id="quantity" value="-1"></label>
+  <label>Multiplier <input type="number" id="multiplier" value="100"></label>
   <label>Order Price <input type="text" id="orderPrice" value="50.00"></label>
   <label>Price Type 
     <select id="priceType">
@@ -62,6 +69,7 @@
   <button onclick="copyClosing()">Copy Closing Order</button>
 
   <script>
+    // Show custom width input if selected
     document.getElementById("width").addEventListener("change", function() {
       document.getElementById("customWidthLabel").style.display = 
         this.value === "custom" ? "block" : "none";
@@ -86,7 +94,9 @@
       const tradeDate = document.getElementById("tradeDate").value || new Date().toISOString().split('T')[0];
       const formattedDate = formatDate(tradeDate);
 
+      const action = document.getElementById("action").value;
       const quantity = document.getElementById("quantity").value;
+      const multiplier = document.getElementById("multiplier").value;
       const orderPrice = document.getElementById("orderPrice").value;
       const priceType = document.getElementById("priceType").value;
       const yearOverride = document.getElementById("yearOverride").value;
@@ -96,20 +106,22 @@
       let closingOrder = "";
 
       if (tradeType === "Iron Fly") {
-        openingOrder = `SELL ${quantity} 1/-1/1/-1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+        openingOrder = `${action} ${quantity} 1/-1/1/-1 CUSTOM ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
       } else if (tradeType === "Bullish FF IC") {
-        openingOrder = `BUY +1 1/-1/-1/1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+        openingOrder = `BUY +1 1/-1/-1/1 CUSTOM ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
       } else if (tradeType === "Bearish FF IC") {
-        openingOrder = `SELL -1 1/-1/-1/1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+        openingOrder = `SELL -1 1/-1/-1/1 CUSTOM ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
       } else if (tradeType === "Regular Iron Condor") {
-        openingOrder = `SELL -1 IRON CONDOR ${ticker} 100 ${weeklyTag} ${formattedDate} ${anchor+25}/${anchor+width}/${anchor-25}/${anchor-width} CALL/PUT @${orderPrice} ${priceType}`;
+        openingOrder = `SELL -1 IRON CONDOR ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor+25}/${anchor+width}/${anchor-25}/${anchor-width} CALL/PUT @${orderPrice} ${priceType}`;
       }
 
+      // Flip for closing order
       closingOrder = openingOrder.replace("SELL -1", "BUY +1").replace("BUY +1", "SELL -1");
 
       document.getElementById("openingOrder").value = openingOrder;
       document.getElementById("closingOrder").value = closingOrder;
 
+      // Auto copy opening order
       navigator.clipboard.writeText(openingOrder);
       alert("Opening order copied to clipboard!");
     }

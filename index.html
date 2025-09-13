@@ -1,281 +1,137 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>OptionStrat → ThinkOrSwim Formatter</title>
+  <meta charset="UTF-8">
+  <title>TOS Order Generator</title>
   <style>
-    body { font-family: Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial; background:#0f172a; color:#e6eef8; padding:24px; }
-    .card { background: linear-gradient(180deg,#071027 0%, #081428 100%); border:1px solid rgba(255,255,255,0.04); padding:18px; border-radius:12px; max-width:880px; margin:0 auto; box-shadow: 0 8px 30px rgba(2,6,23,0.6);}
-    h1 { margin:0 0 8px 0; font-size:20px; }
-    p.lead { margin:0 0 16px 0; color:#9fb3d6; font-size:13px; }
-    label { display:block; font-size:12px; color:#9fb3d6; margin-top:12px; }
-    input[type="text"], textarea, select { width:100%; padding:10px 12px; margin-top:6px; border-radius:8px; background:#061428; border:1px solid rgba(255,255,255,0.04); color:#e6eef8; font-size:14px; box-sizing:border-box; }
-    .row { display:flex; gap:8px; }
-    .col { flex:1; }
-    button { background:#0ea5a9; color:#022; padding:10px 12px; border-radius:8px; border:0; cursor:pointer; font-weight:600; margin-top:12px; }
-    pre.output { background:rgba(255,255,255,0.02); padding:12px; border-radius:8px; margin-top:12px; font-size:13px; overflow:auto; white-space:pre-wrap; }
-    small.hint { color:#7fa3cf; font-size:12px; display:block; margin-top:6px; }
-    .examples { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
-    .chip { background:#062b3a; padding:6px 10px; border-radius:999px; cursor:pointer; border:1px solid rgba(255,255,255,0.02); font-size:13px; color:#bfe6e6; }
-    footer { margin-top:18px; color:#5f7ea0; font-size:12px; text-align:center; }
+    body { font-family: Arial, sans-serif; margin: 30px; background: #fff; color: #000; }
+    h2 { margin-top: 20px; }
+    label { display: block; margin-top: 10px; }
+    input, select { padding: 6px; margin-top: 4px; width: 250px; }
+    button { margin-top: 15px; padding: 8px 16px; cursor: pointer; }
+    textarea { width: 100%; height: 80px; margin-top: 10px; font-family: monospace; }
   </style>
 </head>
 <body>
-  <div class="card">
-    <h1>OptionStrat → ThinkOrSwim formatter</h1>
-    <p class="lead">Paste your OptionStrat label, tweak a couple fields, and get a ThinkOrSwim order string you can copy/paste into TOS order entry. (No trading, just formatting.)</p>
 
-    <label>OptionStrat input</label>
-    <input id="inputText" type="text" placeholder="e.g. SPX Sep 12th 6510/6550/6590 Iron Butterfly" value="SPX Sep 12th 6510/6550/6590 Iron Butterfly" />
+  <h1>Thinkorswim Order Generator</h1>
 
-    <div class="row" style="margin-top:8px;">
-      <div class="col">
-        <label>Action</label>
-        <select id="action">
-          <option>SELL</option>
-          <option>BUY</option>
-        </select>
-      </div>
-      <div class="col">
-        <label>Quantity (absolute)</label>
-        <input id="qty" type="text" value="-1" />
-        <small class="hint">Use -1 to match "SELL -1" style; positive numbers fine for BUY.</small>
-      </div>
-      <div class="col">
-        <label>Multiplier</label>
-        <input id="mult" type="text" value="100" />
-      </div>
-    </div>
+  <label>Trade Type
+    <select id="tradeType">
+      <option value="Iron Fly">Iron Fly</option>
+      <option value="Bullish FF IC">Bullish FF IC</option>
+      <option value="Bearish FF IC">Bearish FF IC</option>
+      <option value="Regular Iron Condor">Regular Iron Condor</option>
+    </select>
+  </label>
 
-    <div class="row">
-      <div class="col">
-        <label>Order price (optional)</label>
-        <input id="price" type="text" placeholder="47.95" />
-      </div>
-      <div class="col">
-        <label>Price type</label>
-        <select id="priceType">
-          <option>LMT</option>
-          <option>MARKET</option>
-          <option>NET_DEBIT</option>
-          <option>NET_CREDIT</option>
-        </select>
-      </div>
-      <div class="col">
-        <label>Year override</label>
-        <input id="year" type="text" placeholder="2025" />
-        <small class="hint">Leave empty to auto-select current year.</small>
-      </div>
-    </div>
+  <label>Anchor Strike <input type="number" id="anchorStrike" placeholder="6700"></label>
+  
+  <label>Width
+    <select id="width">
+      <option value="5">5</option>
+      <option value="20">20</option>
+      <option value="40">40</option>
+      <option value="50">50</option>
+      <option value="100">100</option>
+      <option value="custom">Custom</option>
+    </select>
+  </label>
+  <label id="customWidthLabel" style="display:none;">Custom Width <input type="number" id="customWidth"></label>
 
-    <label style="margin-top:12px;"><input id="isWeeklys" type="checkbox" checked /> Include (Weeklys) tag</label>
+  <label>Ticker <input type="text" id="ticker" value="SPX"></label>
+  <label>Date <input type="date" id="tradeDate"></label>
+  <label>Action 
+    <select id="action">
+      <option value="SELL">SELL</option>
+      <option value="BUY">BUY</option>
+    </select>
+  </label>
+  <label>Quantity <input type="number" id="quantity" value="-1"></label>
+  <label>Multiplier <input type="number" id="multiplier" value="100"></label>
+  <label>Order Price <input type="text" id="orderPrice" value="50.00"></label>
+  <label>Price Type 
+    <select id="priceType">
+      <option value="LMT">LMT</option>
+      <option value="MKT">MKT</option>
+    </select>
+  </label>
+  <label>Year Override <input type="number" id="yearOverride" value="2025"></label>
+  <label><input type="checkbox" id="weeklyTag" checked> Include (Weeklys)</label>
 
-    <div style="margin-top:10px;">
-      <button id="convertBtn">Convert →</button>
-      <button id="copyBtn" style="background:#5b21b6; margin-left:8px;">Copy output</button>
-    </div>
+  <button onclick="generateOrder()">Convert & Copy</button>
 
-    <pre class="output" id="outputArea">Output will appear here...</pre>
+  <h2>Opening Order</h2>
+  <textarea id="openingOrder" readonly></textarea>
 
-    <div style="margin-top:12px;">
-      <strong>Quick examples:</strong>
-      <div class="examples">
-        <div class="chip" data-s="SPX Sep 12th 6510/6550/6590 Iron Butterfly">SPX Sep 12th ...</div>
-        <div class="chip" data-s="SPY Oct 3 400/410/420 Iron Butterfly">SPY Oct 3 ...</div>
-        <div class="chip" data-s="AAPL Nov 21 150/155/160 Iron Butterfly">AAPL Nov 21 ...</div>
-      </div>
-    </div>
+  <h2>Closing Order</h2>
+  <textarea id="closingOrder" readonly></textarea>
+  <button onclick="copyClosing()">Copy Closing Order</button>
 
-    <footer>Deploy this file to a GitHub Pages repo for a tiny web app. Want a repo skeleton? I can give it.</footer>
-  </div>
-
-<script>
-(function(){
-  const MONTHS = {jan:'JAN', feb:'FEB', mar:'MAR', apr:'APR', may:'MAY', jun:'JUN', jul:'JUL', aug:'AUG', sep:'SEP', sept:'SEP', oct:'OCT', nov:'NOV', dec:'DEC', september:'SEP', august:'AUG'};
-  const mapStrategy = {
-    'iron butterfly': 'IRON CONDOR',   // loose mapping to match your example
-    'iron condor': 'IRON CONDOR',
-    'butterfly': 'BUTTERFLY',
-    'condor': 'CONDOR'
-  };
-
-  function parseInput(s) {
-    // Normalize
-    s = s.trim();
-    // Underlying = first token (letters/numbers)
-    const underlyingMatch = s.match(/^([A-Za-z0-9\.\^]+)/);
-    const underlying = underlyingMatch ? underlyingMatch[1].toUpperCase() : '';
-
-    // Month + day. support "Sep 12th", "September 12", "Oct 3"
-    let month = null, day = null;
-    const md = s.match(/([A-Za-z]+)\s+(\d{1,2})(?:st|nd|rd|th)?/i);
-    if (md) {
-      month = md[1].toLowerCase();
-      day = parseInt(md[2],10);
-    } else {
-      // also allow formats like "12 Sep"
-      const md2 = s.match(/(\d{1,2})\s+([A-Za-z]+)/i);
-      if (md2) {
-        day = parseInt(md2[1],10);
-        month = md2[2].toLowerCase();
-      }
-    }
-
-    // strikes: find 2+ numbers separated by '/'
-    const strikesMatch = s.match(/(\d+(?:\.\d+)?)\s*\/\s*(\d+(?:\.\d+)?)(?:\s*\/\s*(\d+(?:\.\d+)?))?/);
-    let strikes = [];
-    if (strikesMatch) {
-      // split by '/' robustly
-      // find the first substring that looks like "num/num[/num]"
-      const all = s.match(/(\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)+)/);
-      if (all && all[1]) {
-        strikes = all[1].split('/').map(x=>x.trim());
-      }
-    }
-
-    // strategy: last word(s) e.g. "Iron Butterfly"
-    // we attempt to read trailing words after strikes
-    let strategy = '';
-    const strategyMatch = s.match(/(?:\d+(?:\.\d+)?(?:\s*\/\s*\d+(?:\.\d+)?)+)\s+(.+)$/i);
-    if (strategyMatch) {
-      strategy = strategyMatch[1].trim();
-    } else {
-      // fallback: last token
-      const parts = s.split(' ');
-      strategy = parts.slice(-2).join(' ');
-    }
-
-    return { underlying, month, day, strikes, strategyRaw: strategy };
-  }
-
-  function monthToMon(monthStr) {
-    if (!monthStr) return '';
-    const k = monthStr.toLowerCase().slice(0,3);
-    return MONTHS[k] || monthStr.toUpperCase().slice(0,3);
-  }
-
-  function yearShort(year) {
-    return String(year).slice(-2);
-  }
-
-  function buildTOSString(parsed, opts) {
-    // opts: action, qty, mult, price, priceType, year, isWeeklys
-    const {underlying, month, day, strikes, strategyRaw} = parsed;
-
-    if (!underlying || !month || !day || strikes.length < 2) {
-      return 'Could not parse input — make sure it includes underlying, month/day and strikes (e.g. SPX Sep 12th 6510/6550/6590)';
-    }
-
-    // normalize strikes to numeric strings
-    const s = strikes.map(x => x.replace(/[^0-9.]/g,''));
-
-    // Strategy mapping
-    const key = strategyRaw.toLowerCase();
-    let stratLabel = mapStrategy[key] || (mapStrategy[key.split(' ').slice(-2).join(' ')] || (strategyRaw.toUpperCase()));
-
-    // Special handling for Iron Butterfly -> create call/put strike order like your example:
-    // input strikes: [low, mid, high] -> CALL: mid/high, PUT: mid/low -> "mid/high/mid/low CALL/PUT"
-    let strikeOrder = '';
-    if (/iron butterfly/i.test(strategyRaw) || /butterfly/i.test(strategyRaw)) {
-      // make sure we have 3 strikes (low, mid, high). if only two provided, create symmetric wings (guess)
-      let low, mid, high;
-      if (s.length === 3) {
-        [low, mid, high] = s;
-      } else if (s.length === 2) {
-        // guess: lower & upper -> mid is center
-        low = s[0]; high = s[1]; mid = String((parseFloat(low) + parseFloat(high))/2);
-      } else {
-        // fallback
-        low = s[0]; mid = s[1] || s[0]; high = s[s.length-1];
-      }
-      // format: mid/high/mid/low
-      strikeOrder = `${mid}/${high}/${mid}/${low} CALL/PUT`;
-    } else if (/iron condor/i.test(strategyRaw) || /condor/i.test(strategyRaw)) {
-      // For a 4-strike condor user might input 4 strikes; otherwise we try to infer from 3 strikes
-      if (s.length === 4) {
-        // assume order left->right: lowShort/lowLong/highShort/highLong or similar
-        strikeOrder = `${s[2]}/${s[3]}/${s[1]}/${s[0]} CALL/PUT`;
-      } else if (s.length === 3) {
-        // [low, low-mid, high] -> similar transform to butterfly
-        const [low, mid, high] = s;
-        strikeOrder = `${mid}/${high}/${mid}/${low} CALL/PUT`;
-      } else {
-        strikeOrder = s.join('/') + ' CALL/PUT';
-      }
-    } else {
-      // generic fallback: if 3 strikes produce mid/high/mid/low format; else join
-      if (s.length === 3) {
-        const [low, mid, high] = s;
-        strikeOrder = `${mid}/${high}/${mid}/${low} CALL/PUT`;
-      } else {
-        strikeOrder = s.join('/') + ' CALL/PUT';
-      }
-    }
-
-    // date formatting: "12 SEP 25"
-    const mon = monthToMon(month);
-    const y = opts.year ? opts.year : (new Date()).getFullYear();
-    const yShort = yearShort(y);
-
-    const weeklyText = opts.isWeeklys ? '(Weeklys)' : '';
-
-    // final pieces
-    const action = opts.action || 'SELL';
-    const qty = opts.qty || '-1';
-    const mult = opts.mult || '100';
-    let priceFragment = '';
-    if (opts.price) {
-      priceFragment = ` @${opts.price} ${opts.priceType || 'LMT'}`;
-    } else {
-      priceFragment = ` ${opts.priceType || 'LMT'}`; // still show type
-    }
-
-    // assemble
-    const out = `${action} ${qty} ${stratLabel} ${underlying} ${mult} ${weeklyText} ${day} ${mon} ${yShort} ${strikeOrder}${priceFragment}`.replace(/\s+/g,' ').trim();
-    return out;
-  }
-
-  // UI wiring
-  const input = document.getElementById('inputText');
-  const btn = document.getElementById('convertBtn');
-  const out = document.getElementById('outputArea');
-  const copyBtn = document.getElementById('copyBtn');
-
-  document.querySelectorAll('.chip').forEach(c => {
-    c.addEventListener('click', ()=> {
-      input.value = c.dataset.s;
+  <script>
+    // Show custom width input if selected
+    document.getElementById("width").addEventListener("change", function() {
+      document.getElementById("customWidthLabel").style.display = 
+        this.value === "custom" ? "block" : "none";
     });
-  });
 
-  btn.addEventListener('click', () => {
-    const text = input.value;
-    const parsed = parseInput(text);
-    const opts = {
-      action: document.getElementById('action').value,
-      qty: document.getElementById('qty').value,
-      mult: document.getElementById('mult').value,
-      price: (document.getElementById('price').value || '').trim(),
-      priceType: document.getElementById('priceType').value,
-      year: (document.getElementById('year').value || '').trim() || null,
-      isWeeklys: document.getElementById('isWeeklys').checked
-    };
-    const result = buildTOSString(parsed, opts);
-    out.textContent = result;
-  });
-
-  copyBtn.addEventListener('click', async () => {
-    try {
-      await navigator.clipboard.writeText(out.textContent);
-      copyBtn.textContent = 'Copied!';
-      setTimeout(()=> copyBtn.textContent = 'Copy output', 1200);
-    } catch(e) {
-      alert('Could not copy — select and copy manually.');
+    function formatDate(inputDate) {
+      const date = new Date(inputDate);
+      const day = date.toLocaleString('en-US', { day: '2-digit' });
+      const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase();
+      const year = date.getFullYear().toString().slice(-2);
+      return `${day} ${month} ${year}`;
     }
-  });
 
-  // run initial conversion
-  btn.click();
+    function generateOrder() {
+      const tradeType = document.getElementById("tradeType").value;
+      const anchor = parseInt(document.getElementById("anchorStrike").value);
+      let width = document.getElementById("width").value;
+      if (width === "custom") width = parseInt(document.getElementById("customWidth").value);
+      else width = parseInt(width);
 
-})();
-</script>
+      const ticker = document.getElementById("ticker").value.toUpperCase();
+      const tradeDate = document.getElementById("tradeDate").value || new Date().toISOString().split('T')[0];
+      const formattedDate = formatDate(tradeDate);
+
+      const action = document.getElementById("action").value;
+      const quantity = document.getElementById("quantity").value;
+      const multiplier = document.getElementById("multiplier").value;
+      const orderPrice = document.getElementById("orderPrice").value;
+      const priceType = document.getElementById("priceType").value;
+      const yearOverride = document.getElementById("yearOverride").value;
+      const weeklyTag = document.getElementById("weeklyTag").checked ? "(Weeklys)" : "";
+
+      let openingOrder = "";
+      let closingOrder = "";
+
+      if (tradeType === "Iron Fly") {
+        openingOrder = `${action} ${quantity} 1/-1/1/-1 CUSTOM ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+      } else if (tradeType === "Bullish FF IC") {
+        openingOrder = `BUY +1 1/-1/-1/1 CUSTOM ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+      } else if (tradeType === "Bearish FF IC") {
+        openingOrder = `SELL -1 1/-1/-1/1 CUSTOM ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+      } else if (tradeType === "Regular Iron Condor") {
+        openingOrder = `SELL -1 IRON CONDOR ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor+25}/${anchor+width}/${anchor-25}/${anchor-width} CALL/PUT @${orderPrice} ${priceType}`;
+      }
+
+      // Flip for closing order
+      closingOrder = openingOrder.replace("SELL -1", "BUY +1").replace("BUY +1", "SELL -1");
+
+      document.getElementById("openingOrder").value = openingOrder;
+      document.getElementById("closingOrder").value = closingOrder;
+
+      // Auto copy opening order
+      navigator.clipboard.writeText(openingOrder);
+      alert("Opening order copied to clipboard!");
+    }
+
+    function copyClosing() {
+      const closing = document.getElementById("closingOrder").value;
+      navigator.clipboard.writeText(closing);
+      alert("Closing order copied to clipboard!");
+    }
+  </script>
+
+</body>
+</html>

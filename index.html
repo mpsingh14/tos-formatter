@@ -2,136 +2,145 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>TOS Order Generator</title>
+  <title>Thinkorswim Order Builder</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 30px; background: #fff; color: #000; }
-    h2 { margin-top: 20px; }
-    label { display: block; margin-top: 10px; }
-    input, select { padding: 6px; margin-top: 4px; width: 250px; }
-    button { margin-top: 15px; padding: 8px 16px; cursor: pointer; }
-    textarea { width: 100%; height: 80px; margin-top: 10px; font-family: monospace; }
+    body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; color: #333; }
+    h1 { font-size: 22px; }
+    label { display: block; margin-top: 15px; }
+    select, input { padding: 6px; margin-top: 5px; width: 220px; }
+    button { margin-top: 20px; padding: 10px 15px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 5px; }
+    textarea { width: 100%; height: 80px; margin-top: 10px; padding: 10px; }
+    .output-section { margin-top: 30px; }
   </style>
 </head>
 <body>
+  <h1>Thinkorswim Order Builder</h1>
 
-  <h1>Thinkorswim Order Generator</h1>
+  <label>Trade Type:</label>
+  <select id="tradeType">
+    <option value="ironFly">Iron Fly</option>
+    <option value="bullishFFIC">Bullish FF IC</option>
+    <option value="bearishFFIC">Bearish FF IC</option>
+    <option value="regularIC">Regular Iron Condor</option>
+  </select>
 
-  <label>Trade Type
-    <select id="tradeType">
-      <option value="Iron Fly">Iron Fly</option>
-      <option value="Bullish FF IC">Bullish FF IC</option>
-      <option value="Bearish FF IC">Bearish FF IC</option>
-      <option value="Regular Iron Condor">Regular Iron Condor</option>
-    </select>
-  </label>
+  <label>Anchor Strike:</label>
+  <input type="number" id="anchorStrike" placeholder="e.g. 6700">
 
-  <label>Anchor Strike <input type="number" id="anchorStrike" placeholder="6700"></label>
-  
-  <label>Width
-    <select id="width">
-      <option value="5">5</option>
-      <option value="20">20</option>
-      <option value="40">40</option>
-      <option value="50">50</option>
-      <option value="100">100</option>
-      <option value="custom">Custom</option>
-    </select>
-  </label>
-  <label id="customWidthLabel" style="display:none;">Custom Width <input type="number" id="customWidth"></label>
+  <label>Width:</label>
+  <select id="width" onchange="toggleCustomWidth()">
+    <option value="5">5</option>
+    <option value="20">20</option>
+    <option value="40">40</option>
+    <option value="50" selected>50</option>
+    <option value="100">100</option>
+    <option value="custom">Custom</option>
+  </select>
+  <input type="number" id="customWidth" placeholder="Enter custom width" style="display:none;">
 
-  <label>Ticker <input type="text" id="ticker" value="SPX"></label>
-  <label>Date <input type="date" id="tradeDate"></label>
-  <label>Action 
-    <select id="action">
-      <option value="SELL">SELL</option>
-      <option value="BUY">BUY</option>
-    </select>
-  </label>
-  <label>Quantity <input type="number" id="quantity" value="-1"></label>
-  <label>Multiplier <input type="number" id="multiplier" value="100"></label>
-  <label>Order Price <input type="text" id="orderPrice" value="50.00"></label>
-  <label>Price Type 
-    <select id="priceType">
-      <option value="LMT">LMT</option>
-      <option value="MKT">MKT</option>
-    </select>
-  </label>
-  <label>Year Override <input type="number" id="yearOverride" value="2025"></label>
-  <label><input type="checkbox" id="weeklyTag" checked> Include (Weeklys)</label>
+  <label>Ticker:</label>
+  <input type="text" id="ticker" value="SPX">
+
+  <label>Date:</label>
+  <input type="date" id="tradeDate">
+
+  <label>Quantity:</label>
+  <input type="number" id="quantity" value="-1">
+
+  <label>Order Price:</label>
+  <input type="number" id="orderPrice" value="50.00">
+
+  <label>Price Type:</label>
+  <select id="priceType">
+    <option value="LMT">LMT</option>
+    <option value="MKT">MKT</option>
+  </select>
+
+  <label>Year Override:</label>
+  <input type="number" id="yearOverride" placeholder="Optional">
+
+  <label><input type="checkbox" id="weeklyTag" checked> Include weekly tag</label>
 
   <button onclick="generateOrder()">Convert & Copy</button>
 
-  <h2>Opening Order</h2>
-  <textarea id="openingOrder" readonly></textarea>
+  <div class="output-section">
+    <label>Opening Order:</label>
+    <textarea id="outputOrder" readonly></textarea>
 
-  <h2>Closing Order</h2>
-  <textarea id="closingOrder" readonly></textarea>
-  <button onclick="copyClosing()">Copy Closing Order</button>
+    <label>Closing Order:</label>
+    <textarea id="closingOrder" readonly></textarea>
+    <button onclick="copyClosing()">Copy Closing Order</button>
+  </div>
 
-  <script>
-    // Show custom width input if selected
-    document.getElementById("width").addEventListener("change", function() {
-      document.getElementById("customWidthLabel").style.display = 
-        this.value === "custom" ? "block" : "none";
-    });
+<script>
+function toggleCustomWidth() {
+  const width = document.getElementById("width").value;
+  document.getElementById("customWidth").style.display = (width === "custom") ? "block" : "none";
+}
 
-    function formatDate(inputDate) {
-      const date = new Date(inputDate);
-      const day = date.toLocaleString('en-US', { day: '2-digit' });
-      const month = date.toLocaleString('en-US', { month: 'short' }).toUpperCase();
-      const year = date.getFullYear().toString().slice(-2);
-      return `${day} ${month} ${year}`;
+function generateOrder() {
+  const tradeType = document.getElementById("tradeType").value;
+  const anchorValue = document.getElementById("anchorStrike").value;
+
+  if (!anchorValue) {
+    alert("Please enter an Anchor Strike value.");
+    return;
+  }
+  const anchor = parseInt(anchorValue);
+
+  let width = document.getElementById("width").value;
+  if (width === "custom") {
+    const customWidth = document.getElementById("customWidth").value;
+    if (!customWidth) {
+      alert("Please enter a custom width.");
+      return;
     }
+    width = parseInt(customWidth);
+  } else {
+    width = parseInt(width);
+  }
 
-    function generateOrder() {
-      const tradeType = document.getElementById("tradeType").value;
-      const anchor = parseInt(document.getElementById("anchorStrike").value);
-      let width = document.getElementById("width").value;
-      if (width === "custom") width = parseInt(document.getElementById("customWidth").value);
-      else width = parseInt(width);
+  const ticker = document.getElementById("ticker").value || "SPX";
+  const tradeDate = document.getElementById("tradeDate").value;
+  const formattedDate = tradeDate ? new Date(tradeDate).toLocaleDateString('en-US',{day:'2-digit',month:'short',year:'2-digit'}).toUpperCase() : "";
+  const quantity = document.getElementById("quantity").value || "-1";
+  const orderPrice = document.getElementById("orderPrice").value || "50.00";
+  const priceType = document.getElementById("priceType").value;
+  const yearOverride = document.getElementById("yearOverride").value;
+  const weeklyTag = document.getElementById("weeklyTag").checked ? "(Weeklys)" : "";
 
-      const ticker = document.getElementById("ticker").value.toUpperCase();
-      const tradeDate = document.getElementById("tradeDate").value || new Date().toISOString().split('T')[0];
-      const formattedDate = formatDate(tradeDate);
+  let openingOrder = "";
+  let closingOrder = "";
 
-      const action = document.getElementById("action").value;
-      const quantity = document.getElementById("quantity").value;
-      const multiplier = document.getElementById("multiplier").value;
-      const orderPrice = document.getElementById("orderPrice").value;
-      const priceType = document.getElementById("priceType").value;
-      const yearOverride = document.getElementById("yearOverride").value;
-      const weeklyTag = document.getElementById("weeklyTag").checked ? "(Weeklys)" : "";
+  if (tradeType === "ironFly") {
+    openingOrder = `SELL ${quantity} 1/-1/1/-1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+    closingOrder = `BUY ${Math.abs(quantity)} 1/-1/1/-1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+  }
+  else if (tradeType === "bullishFFIC") {
+    openingOrder = `BUY +1 1/-1/-1/1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+    closingOrder = `SELL -1 1/-1/-1/1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+  }
+  else if (tradeType === "bearishFFIC") {
+    openingOrder = `SELL -1 1/-1/-1/1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+    closingOrder = `BUY +1 1/-1/-1/1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+  }
+  else if (tradeType === "regularIC") {
+    openingOrder = `SELL -1 IRON CONDOR ${ticker} 100 ${weeklyTag} ${formattedDate} ${anchor+25}/${anchor+width}/${anchor-25}/${anchor-width} CALL/PUT @${orderPrice} ${priceType}`;
+    closingOrder = `BUY +1 IRON CONDOR ${ticker} 100 ${weeklyTag} ${formattedDate} ${anchor+25}/${anchor+width}/${anchor-25}/${anchor-width} CALL/PUT @${orderPrice} ${priceType}`;
+  }
 
-      let openingOrder = "";
-      let closingOrder = "";
+  document.getElementById("outputOrder").value = openingOrder;
+  document.getElementById("closingOrder").value = closingOrder;
 
-      if (tradeType === "Iron Fly") {
-        openingOrder = `${action} ${quantity} 1/-1/1/-1 CUSTOM ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
-      } else if (tradeType === "Bullish FF IC") {
-        openingOrder = `BUY +1 1/-1/-1/1 CUSTOM ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
-      } else if (tradeType === "Bearish FF IC") {
-        openingOrder = `SELL -1 1/-1/-1/1 CUSTOM ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
-      } else if (tradeType === "Regular Iron Condor") {
-        openingOrder = `SELL -1 IRON CONDOR ${ticker} ${multiplier} ${weeklyTag} ${formattedDate} ${anchor+25}/${anchor+width}/${anchor-25}/${anchor-width} CALL/PUT @${orderPrice} ${priceType}`;
-      }
+  navigator.clipboard.writeText(openingOrder);
+  alert("Opening order copied!");
+}
 
-      // Flip for closing order
-      closingOrder = openingOrder.replace("SELL -1", "BUY +1").replace("BUY +1", "SELL -1");
-
-      document.getElementById("openingOrder").value = openingOrder;
-      document.getElementById("closingOrder").value = closingOrder;
-
-      // Auto copy opening order
-      navigator.clipboard.writeText(openingOrder);
-      alert("Opening order copied to clipboard!");
-    }
-
-    function copyClosing() {
-      const closing = document.getElementById("closingOrder").value;
-      navigator.clipboard.writeText(closing);
-      alert("Closing order copied to clipboard!");
-    }
-  </script>
-
+function copyClosing() {
+  const text = document.getElementById("closingOrder").value;
+  navigator.clipboard.writeText(text);
+  alert("Closing order copied!");
+}
+</script>
 </body>
 </html>

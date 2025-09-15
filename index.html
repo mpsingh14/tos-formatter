@@ -4,17 +4,18 @@
   <meta charset="UTF-8">
   <title>Thinkorswim Order Builder</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; color: #333; }
-    h1 { font-size: 22px; }
-    label { display: block; margin-top: 15px; }
-    select, input { padding: 6px; margin-top: 5px; width: 220px; }
-    button { margin-top: 20px; padding: 10px 15px; cursor: pointer; background: #4CAF50; color: white; border: none; border-radius: 5px; }
-    textarea { width: 100%; height: 80px; margin-top: 10px; padding: 10px; }
-    .output-section { margin-top: 30px; }
+    body { font-family: Arial, sans-serif; margin: 40px; background: #f9f9f9; color: #111; }
+    h1 { font-size: 22px; margin-bottom: 6px; }
+    label { display: block; margin-top: 12px; }
+    select, input { padding: 6px; margin-top: 6px; width: 240px; }
+    button { margin-top: 18px; padding: 10px 14px; cursor: pointer; background: #2563EB; color: white; border: none; border-radius: 5px; }
+    textarea { width: 100%; height: 84px; margin-top: 10px; padding: 10px; font-family: monospace; }
+    .small { font-size: 13px; color: #444; }
   </style>
 </head>
 <body>
   <h1>Thinkorswim Order Builder</h1>
+  <div class="small">Minimal form — choose trade type, anchor strike, width (defaults to 50), date, quantity and price. Click Convert &amp; Copy to generate orders.</div>
 
   <label>Trade Type:</label>
   <select id="tradeType">
@@ -36,7 +37,7 @@
     <option value="100">100</option>
     <option value="custom">Custom</option>
   </select>
-  <input type="number" id="customWidth" placeholder="Enter custom width" style="display:none;">
+  <input type="number" id="customWidth" placeholder="Enter custom width" style="display:none; margin-top:6px;">
 
   <label>Ticker:</label>
   <input type="text" id="ticker" value="SPX">
@@ -59,11 +60,11 @@
   <label>Year Override:</label>
   <input type="number" id="yearOverride" placeholder="Optional">
 
-  <label><input type="checkbox" id="weeklyTag" checked> Include weekly tag</label>
+  <label style="margin-top:8px;"><input type="checkbox" id="weeklyTag" checked> Include (Weeklys)</label>
 
-  <button onclick="generateOrder()">Convert & Copy</button>
+  <button onclick="generateOrder()">Convert &amp; Copy</button>
 
-  <div class="output-section">
+  <div style="margin-top:26px;">
     <label>Opening Order:</label>
     <textarea id="outputOrder" readonly></textarea>
 
@@ -73,73 +74,99 @@
   </div>
 
 <script>
-function toggleCustomWidth() {
-  const width = document.getElementById("width").value;
-  document.getElementById("customWidth").style.display = (width === "custom") ? "block" : "none";
+function toggleCustomWidth(){
+  document.getElementById('customWidth').style.display = document.getElementById('width').value === 'custom' ? 'block' : 'none';
 }
 
-function generateOrder() {
-  const tradeType = document.getElementById("tradeType").value;
-  const anchorValue = document.getElementById("anchorStrike").value;
+function twoDigit(n){ return (n<10? '0'+n : ''+n); }
+const MONTHS = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
 
-  if (!anchorValue) {
-    alert("Please enter an Anchor Strike value.");
+function formatFromYmd(ymd){
+  // input ymd like "2025-09-18"
+  const parts = ymd.split('-');
+  if(parts.length !== 3) return '';
+  const y = parts[0];
+  const m = parseInt(parts[1],10) - 1;
+  const d = parts[2];
+  return `${d} ${MONTHS[m]} ${y.slice(-2)}`;
+}
+
+function generateOrder(){
+  const tradeType = document.getElementById('tradeType').value;
+  const anchorVal = document.getElementById('anchorStrike').value;
+  if(!anchorVal){
+    alert('Please enter an Anchor Strike (e.g. 6700).');
     return;
   }
-  const anchor = parseInt(anchorValue);
+  const anchor = parseInt(anchorVal,10);
 
-  let width = document.getElementById("width").value;
-  if (width === "custom") {
-    const customWidth = document.getElementById("customWidth").value;
-    if (!customWidth) {
-      alert("Please enter a custom width.");
-      return;
-    }
-    width = parseInt(customWidth);
-  } else {
-    width = parseInt(width);
+  let widthVal = document.getElementById('width').value;
+  if(widthVal === 'custom'){
+    const cw = document.getElementById('customWidth').value;
+    if(!cw){ alert('Please enter a custom width.'); return; }
+    widthVal = cw;
   }
+  const width = parseInt(widthVal,10);
 
-  const ticker = document.getElementById("ticker").value || "SPX";
-  const tradeDate = document.getElementById("tradeDate").value;
-  const formattedDate = tradeDate ? new Date(tradeDate).toLocaleDateString('en-US',{day:'2-digit',month:'short',year:'2-digit'}).toUpperCase() : "";
-  const quantity = document.getElementById("quantity").value || "-1";
-  const orderPrice = document.getElementById("orderPrice").value || "50.00";
-  const priceType = document.getElementById("priceType").value;
-  const yearOverride = document.getElementById("yearOverride").value;
-  const weeklyTag = document.getElementById("weeklyTag").checked ? "(Weeklys)" : "";
+  const ticker = (document.getElementById('ticker').value || 'SPX').toUpperCase();
 
-  let openingOrder = "";
-  let closingOrder = "";
-
-  if (tradeType === "ironFly") {
-    openingOrder = `SELL ${quantity} 1/-1/1/-1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
-    closingOrder = `BUY ${Math.abs(quantity)} 1/-1/1/-1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+  // Use the raw date input string (YYYY-MM-DD) to avoid timezone shifts.
+  let tradeDateRaw = document.getElementById('tradeDate').value;
+  if(!tradeDateRaw){
+    // default to local today (YYYY-MM-DD)
+    const today = new Date();
+    const yyyy = today.getFullYear();
+    const mm = twoDigit(today.getMonth()+1);
+    const dd = twoDigit(today.getDate());
+    tradeDateRaw = `${yyyy}-${mm}-${dd}`;
   }
-  else if (tradeType === "bullishFFIC") {
+  const formattedDate = formatFromYmd(tradeDateRaw);
+
+  const quantityRaw = document.getElementById('quantity').value || '-1';
+  const quantityNum = parseInt(quantityRaw,10);
+  const orderPrice = document.getElementById('orderPrice').value || '50.00';
+  const priceType = document.getElementById('priceType').value || 'LMT';
+  const weeklyTag = document.getElementById('weeklyTag').checked ? '(Weeklys)' : '';
+
+  let openingOrder = '';
+  let closingOrder = '';
+
+  // Build strings according to your logic
+  if(tradeType === 'ironFly'){
+    // use the quantity field for Iron Fly
+    openingOrder = `SELL ${quantityRaw} 1/-1/1/-1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+    const closingQty = (quantityNum < 0) ? ('+' + Math.abs(quantityNum)) : ('-' + Math.abs(quantityNum));
+    closingOrder = `BUY ${closingQty} 1/-1/1/-1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
+  } else if(tradeType === 'bullishFFIC'){
     openingOrder = `BUY +1 1/-1/-1/1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
     closingOrder = `SELL -1 1/-1/-1/1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
-  }
-  else if (tradeType === "bearishFFIC") {
+  } else if(tradeType === 'bearishFFIC'){
     openingOrder = `SELL -1 1/-1/-1/1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
     closingOrder = `BUY +1 1/-1/-1/1 CUSTOM ${ticker} 100 ${weeklyTag} ${formattedDate}/${formattedDate}/${formattedDate}/${formattedDate} ${anchor}/${anchor+width}/${anchor}/${anchor-width} CALL/CALL/PUT/PUT @${orderPrice} ${priceType}`;
-  }
-  else if (tradeType === "regularIC") {
+  } else if(tradeType === 'regularIC'){
     openingOrder = `SELL -1 IRON CONDOR ${ticker} 100 ${weeklyTag} ${formattedDate} ${anchor+25}/${anchor+width}/${anchor-25}/${anchor-width} CALL/PUT @${orderPrice} ${priceType}`;
     closingOrder = `BUY +1 IRON CONDOR ${ticker} 100 ${weeklyTag} ${formattedDate} ${anchor+25}/${anchor+width}/${anchor-25}/${anchor-width} CALL/PUT @${orderPrice} ${priceType}`;
   }
 
-  document.getElementById("outputOrder").value = openingOrder;
-  document.getElementById("closingOrder").value = closingOrder;
+  document.getElementById('outputOrder').value = openingOrder;
+  document.getElementById('closingOrder').value = closingOrder;
 
-  navigator.clipboard.writeText(openingOrder);
-  alert("Opening order copied!");
+  // Auto-copy opening order to clipboard
+  navigator.clipboard.writeText(openingOrder).then(()=>{
+    alert('Opening order copied to clipboard!');
+  }).catch(()=>{
+    // fallback alert
+    alert('Opening order generated (copy failed automatically). Select and copy manually.');
+  });
 }
 
-function copyClosing() {
-  const text = document.getElementById("closingOrder").value;
-  navigator.clipboard.writeText(text);
-  alert("Closing order copied!");
+function copyClosing(){
+  const txt = document.getElementById('closingOrder').value;
+  navigator.clipboard.writeText(txt).then(()=>{
+    alert('Closing order copied to clipboard!');
+  }).catch(()=>{
+    alert('Closing order copied to clipboard (manual may be required).');
+  });
 }
 </script>
 </body>
